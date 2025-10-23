@@ -21,11 +21,9 @@ x_min = -20
 x_max = 20
 N_r = 5000
 x = torch.linspace(x_min, x_max, N_r).reshape(N_r,1)
-mu = 2
 
-#mu = -2  #bright
-#u0 = 1/torch.cosh(x) # initial guess bright soliton
-u0 = torch.tanh(x) # initial guess dark soliton
+mu = -2  #bright
+u0 = 1/torch.cosh(x) # initial guess bright soliton
 
 
 
@@ -114,8 +112,7 @@ plt.title("pred")
 plt.show()
 
 xx = np.linspace(x_min,x_max,500)
-#utrue = np.sqrt(-2*mu)*(1/np.cosh(np.sqrt(-mu)*xx)) # bright
-utrue = np.sqrt(mu)*np.tanh(np.sqrt(mu/2)*xx) # dark
+utrue = np.sqrt(-2*mu)*(1/np.cosh(np.sqrt(-mu)*xx)) # bright
 uguess = np.tanh(xx)
 plt.plot(xx, utrue, label="true")
 plt.plot(xx, uguess, label="guess")
