@@ -17,6 +17,10 @@ mu = 1.0
 N_r = 100
 x = torch.linspace(x_min, x_max, N_r).reshape(-1, 1)
 y = torch.linspace(y_min, y_max, N_r).reshape(-1, 1)
+
+x = (torch.rand(N_r)*2*x_max -x_max).reshape(-1,1)
+y = (torch.rand(N_r)*2*y_max -y_max).reshape(-1,1)
+
 u_target = 2.2 * torch.exp(-(x**2 + y**2))  # target Gaussian
 
 # ================================
