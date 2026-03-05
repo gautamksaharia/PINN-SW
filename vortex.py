@@ -1,4 +1,3 @@
-
 import torch
 import torch.nn as nn
 import numpy as np
@@ -7,6 +6,8 @@ import time
 from torch.optim.lr_scheduler import StepLR
 
 torch.manual_seed(123)
+# Device
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ================================
 # 1. Problem setup
@@ -32,11 +33,8 @@ def V(x, y):
     return 0.5*(x**2 + y**2)
 
 
-# Thomas-Fermi initial wavefunction
-# ----------------------
 # Thomas-Fermi initial state
 Vgrid = V(x, y)  # <-- make sure to CALL the function
-xx= 1 - Vgrid/mu
 psi0 = torch.sqrt(mu/g) *torch.sqrt((torch.maximum(1 - Vgrid/mu, torch.tensor([0.0]) ) ))
 
 #psi /= np.sqrt(np.sum(np.abs(psi)**2)*dx*dy)  # normalize
@@ -138,7 +136,7 @@ def closure():
 
 print("Stage 2: Fine-tuning with LBFGS...")
 optimizer_lbfgs = torch.optim.LBFGS(Net.parameters(), max_iter=5000, line_search_fn="strong_wolfe")
-optimizer_lbfgs.step(closure)
+#optimizer_lbfgs.step(closure)
 print("LBFGS stage completed.")
 
 # ================================
@@ -197,73 +195,71 @@ plt.show()
 
 
 
-def healing(x, y, psi0, g):
+def psi(x, y, mu, g, V):
+    Vgrid = V(x, y)  # <-- make sure to CALL the function
+
+    psi = torch.sqrt(mu/g) *torch.sqrt((torch.maximum(1 - Vgrid/mu, torch.tensor([0.0]) ) ))
+    return psi
+
+def healing(x, y, mu, g, V, psi):
     """Local healing length at (x,y)."""
-    return 1.0 / torch.sqrt(g * torch.abs(psi0(x, y))**2)
+    psi0 = psi(x, y, mu, g, V)
+    healing_len = 1.0 / (torch.sqrt(g * torch.abs(psi0**2)) + 1e-12 )
+    return healing_len
+
+
+
+def PointVortex(xv, yv, cv):
+    return xv, yv, int(cv)
+
+
+def ScalarVortex(x, y, xi, pv):
+    """
+    Construct scalar GPE vortex with healing length xi
+    and point vortex pv = (xv, yv, qv).
+    """
+
+    xv, yv, qv = pv
+
+    dx = x - xv
+    dy = y - yv
+
+    r = torch.sqrt(dx**2 + dy**2 + 1e-12)
+    xx = r/xi
+
+    # Exact-type radial scaling
+    amp = torch.sqrt(xx**2/(1.0 + xx**2 + 1e-12))
+
+    theta = torch.atan2(dy, dx)
+    phase = torch.exp(1j * qv * theta)
+
+    return amp * phase
+
 
 
 Rtf = torch.sqrt(2 * mu)
 rv = 0.5 * Rtf  # vortex distance from center
-
-xv, yv,cv = rv, 0.0, 1.0
-
-
-class PointVortex:
-    def __init__(self, x, y, q):
-        self.x = x
-        self.y = y
-        self.q = q
-
-class ScalarVortex:
-    def __init__(self, xi, pv: PointVortex):
-        self.xi = xi
-        self.vort = pv
-
+xv, yv, cv = rv, torch.tensor([0.0]), torch.tensor([1.0])
+xi_v = healing(xv, yv, mu, g, V, psi)
 pv1 = PointVortex(xv, yv, cv)
+v1 = ScalarVortex(X, Y, xi_v, pv1).to(device)
+psi_g = psi(X, Y, mu, g, V)
+psi_v = psi_g * v1
 
-xi_v = healing(xv, yv, psi0, g)
 
-v1 = ScalarVortex(xi_v, pv1)
-def imprint_vortex(psi, vortex: ScalarVortex, X, Y):
-    """
-    Imprint a vortex into the 2D wavefunction psi.
-    X, Y are meshgrid arrays corresponding to psi.
-    """
-    x0, y0 = vortex.vort.x, vortex.vort.y
-    q = vortex.vort.q
-    xi = vortex.xi
-    
-    # distance from vortex core
-    r = np.sqrt((X - x0)**2 + (Y - y0)**2)
-    
-    # amplitude modulation (density depletion)
-    psi_mod = psi * np.tanh(r / xi)
-    
-    # phase modulation
-    theta = np.arctan2(Y - y0, X - x0)
-    psi_mod *= np.exp(1j * q * theta)
-    
-    return psi_mod
-# create grid
-x = np.linspace(-Rtf, Rtf, 256)
-y = np.linspace(-Rtf, Rtf, 256)
-X, Y = np.meshgrid(x, y)
+density = torch.abs(psi_v)**2
+phase = torch.angle(psi_v)
 
-# initial wavefunction
-psi_init = psi0(X, Y)  # e.g., Thomas-Fermi profile
+plt.figure()
+plt.imshow(density.cpu() ,origin="lower")
+plt.colorbar()
+plt.title("Density")
 
-# imprint vortex
-psi_v = imprint_vortex(psi_init, v1, X, Y)
-
-# visualize
-import matplotlib.pyplot as plt
-
-plt.imshow(np.angle(psi_v), extent=[x.min(), x.max(), y.min(), y.max()])
-plt.colorbar(label='Phase')
-plt.title("Vortex phase")
+plt.figure()
+plt.imshow(phase.cpu(), origin="lower")
+plt.colorbar()
+plt.title("Phase")
 plt.show()
-
-
 
 
 
