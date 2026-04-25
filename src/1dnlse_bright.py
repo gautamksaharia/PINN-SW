@@ -60,7 +60,7 @@ def ode_residual(Net, x):
     u_x = torch.autograd.grad(u.sum(), x1, create_graph=True)[0]
     u_xx = torch.autograd.grad(u_x.sum(), x1, create_graph=True)[0]
     
-    ode = u_xx  - u**3 + mu*u           
+    ode = u_xx  + u**3 + mu*u           
     return ode, u 
 
 
